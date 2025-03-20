@@ -1,27 +1,53 @@
-def caesar_cipher(text, shift, encrypt=True):
-    result = ""
-    if not encrypt:
-        shift = -shift  # Reverse shift for decryption
+ Caesar Cipher
 
-    for char in text:
-        if char.isalpha():
-            start = ord('A') if char.isupper() else ord('a')
-            result += chr((ord(char) - start + shift) % 26 + start)
-        else:
-            result += char  # Keep non-alphabet characters unchanged
+ Overview
+This is a simple Python implementation of the Caesar Cipher, a basic encryption and decryption technique that shifts the letters of a message by a specified number of positions in the alphabet.
 
-    return result
+ Features
+- Encrypts messages using the Caesar Cipher technique.
+- Decrypts messages by reversing the shift.
+- Preserves non-alphabetic characters (such as spaces and punctuation).
+- Supports both uppercase and lowercase letters.
 
-# User Input
-message = input("Enter your message: ")
-shift_value = int(input("Enter shift value: "))
-choice = input("Do you want to (E)ncrypt or (D)ecrypt? ").strip().lower()
+ How It Works
+The script takes user input for:
+1. The message to be encrypted or decrypted.
+2. The shift value (number of positions to shift in the alphabet).
+3. Whether to encrypt or decrypt the message.
 
-if choice == 'e':
-    output = caesar_cipher(message, shift_value, encrypt=True)
-    print("Encrypted Message:", output)
-elif choice == 'd':
-    output = caesar_cipher(message, shift_value, encrypt=False)
-    print("Decrypted Message:", output)
-else:
-    print("Invalid choice! Please enter 'E' for encryption or 'D' for decryption.")
+ Usage
+Run the script and follow the prompts:
+
+```sh
+python caesar_cipher.py
+```
+
+Example
+```
+Enter your message: Hello, World!
+Enter shift value: 3
+Do you want to (E)ncrypt or (D)ecrypt? e
+Encrypted Message: Khoor, Zruog!
+```
+
+```
+Enter your message: Khoor, Zruog!
+Enter shift value: 3
+Do you want to (E)ncrypt or (D)ecrypt? d
+Decrypted Message: Hello, World!
+```
+
+ Code Explanation
+- The function `caesar_cipher(text, shift, encrypt=True)` performs both encryption and decryption based on the shift value.
+- The shift is reversed for decryption by setting `shift = -shift`.
+- Alphabetic characters are shifted while non-alphabetic characters remain unchanged.
+
+ Requirements
+- Python 3.x
+
+ Contributing
+Feel free to fork this repository, submit pull requests, or report issues.
+
+ License
+This project is licensed under the MIT License.
+
