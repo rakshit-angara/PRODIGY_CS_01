@@ -1,36 +1,27 @@
-# PRODIGY_CS_01
-Caesar Cipher
-Overview
-This is a simple Python implementation of the Caesar Cipher, a basic encryption and decryption technique that shifts the letters of a message by a specified number of positions in the alphabet.
+def caesar_cipher(text, shift, encrypt=True):
+    result = ""
+    if not encrypt:
+        shift = -shift  # Reverse shift for decryption
 
-Features
-Encrypts messages using the Caesar Cipher technique.
-Decrypts messages by reversing the shift.
-Preserves non-alphabetic characters (such as spaces and punctuation).
-Supports both uppercase and lowercase letters.
+    for char in text:
+        if char.isalpha():
+            start = ord('A') if char.isupper() else ord('a')
+            result += chr((ord(char) - start + shift) % 26 + start)
+        else:
+            result += char  # Keep non-alphabet characters unchanged
 
-How It Works
-The script takes user input for:
-The message to be encrypted or decrypted.
-The shift value (number of positions to shift in the alphabet).
-Whether to encrypt or decrypt the message.
+    return result
 
-Usage
-Run the script and follow the prompts:
+# User Input
+message = input("Enter your message: ")
+shift_value = int(input("Enter shift value: "))
+choice = input("Do you want to (E)ncrypt or (D)ecrypt? ").strip().lower()
 
-Example
-Code Explanation
-
-The function caesar_cipher(text, shift, encrypt=True) performs both encryption and decryption based on the shift value.
-The shift is reversed for decryption by setting shift = -shift.
-Alphabetic characters are shifted while non-alphabetic characters remain unchanged.
-
-Requirements
-Python 3.x
-
-Contributing
-Feel free to fork this repository, submit pull requests, or report issues.
-
-License
-This project is licensed under the MIT License.
-
+if choice == 'e':
+    output = caesar_cipher(message, shift_value, encrypt=True)
+    print("Encrypted Message:", output)
+elif choice == 'd':
+    output = caesar_cipher(message, shift_value, encrypt=False)
+    print("Decrypted Message:", output)
+else:
+    print("Invalid choice! Please enter 'E' for encryption or 'D' for decryption.")
