@@ -1,0 +1,150 @@
+import tkinter as tk
+from tkinter import ttk, filedialog
+from scapy.all import sniff, IP, TCP, UDP, ICMP
+import threading
+import time
+import pandas as pd
+import matplotlib.pyplot as plt
+import requests
+import folium
+import webbrowser
+import geocoder
+from collections import Counter
+
+LOG_FILE = "packet_log.txt"
+sniffing = False
+packet_data = []
+
+def get_geoip(ip):
+    """Get approximate location of an IP address."""
+    try:
+        response = requests.get(f"https://ipinfo.io/{ip}/json").json()
+        loc = response.get("loc", "").split(",")
+        country = response.get("country", "Unknown")
+        city = response.get("city", "Unknown")
+        return (float(loc[0]), float(loc[1]), country, city) if len(loc) == 2 else (None, None, country, city)
+    except:
+        return (None, None, "Unknown", "Unknown")
+
+def packet_callback(packet):
+    if IP in packet:
+        src_ip = packet[IP].src
+        dst_ip = packet[IP].dst
+        protocol = "OTHER"
+        payload = "N/A"
+        
+        if TCP in packet:
+            protocol = "TCP"
+        elif UDP in packet:
+            protocol = "UDP"
+        elif ICMP in packet:
+            protocol = "ICMP"
+
+        src_location = get_geoip(src_ip)
+        dst_location = get_geoip(dst_ip)
+        
+        packet_data.append((src_ip, dst_ip, protocol, src_location[2], src_location[3], dst_location[2], dst_location[3], str(payload)[:50]))
+        
+        tree.insert("", tk.END, values=(src_ip, dst_ip, protocol, src_location[2], src_location[3], dst_location[2], dst_location[3], str(payload)[:50]))
+        packet_count.set(packet_count.get() + 1)
+
+def start_sniffing():
+    global sniffing
+    sniffing = True
+    sniff(prn=packet_callback, store=False, stop_filter=lambda p: not sniffing)
+
+def stop_sniffing():
+    global sniffing
+    sniffing = False
+
+def start_sniffer_thread():
+    sniff_thread = threading.Thread(target=start_sniffing, daemon=True)
+    sniff_thread.start()
+
+def apply_filter():
+    tree.delete(*tree.get_children())
+    for entry in packet_data:
+        if protocol_filter.get() != "All" and protocol_filter.get() != entry[2]:
+            continue
+        if src_ip_filter.get() and src_ip_filter.get() not in entry[0]:
+            continue
+        if dst_ip_filter.get() and dst_ip_filter.get() not in entry[1]:
+            continue
+        tree.insert("", tk.END, values=entry)
+
+def plot_map():
+    network_map = folium.Map(location=[20, 0], zoom_start=2)
+    for entry in packet_data:
+        src_lat, src_lon, _, _ = get_geoip(entry[0])
+        dst_lat, dst_lon, _, _ = get_geoip(entry[1])
+        if src_lat and dst_lat:
+            folium.Marker(location=[src_lat, src_lon], popup=f"{entry[0]}").add_to(network_map)
+            folium.Marker(location=[dst_lat, dst_lon], popup=f"{entry[1]}").add_to(network_map)
+            folium.PolyLine([(src_lat, src_lon), (dst_lat, dst_lon)], color='blue', weight=2).add_to(network_map)
+    map_file = "network_map.html"
+    network_map.save(map_file)
+    webbrowser.open(map_file)
+
+def plot_graph():
+    protocol_counts = Counter([entry[2] for entry in packet_data])
+    protocols = list(protocol_counts.keys())
+    counts = list(protocol_counts.values())
+    plt.figure(figsize=(6, 4))
+    plt.bar(protocols, counts, color=['blue', 'red', 'green'])
+    plt.xlabel('Protocol')
+    plt.ylabel('Packet Count')
+    plt.title('Packet Distribution by Protocol')
+    plt.show()
+
+def clear_packets():
+    global packet_data
+    tree.delete(*tree.get_children())
+    packet_data = []
+    packet_count.set(0)
+    open(LOG_FILE, "w").close()
+
+root = tk.Tk()
+root.title("Enhanced Network Packet Sniffer")
+control_frame = tk.Frame(root)
+control_frame.pack(pady=5)
+
+protocol_filter = tk.StringVar(value="All")
+src_ip_filter = tk.StringVar()
+dst_ip_filter = tk.StringVar()
+
+ttk.Label(control_frame, text="Protocol:").pack(side=tk.LEFT, padx=2)
+ttk.Combobox(control_frame, textvariable=protocol_filter, values=["All", "TCP", "UDP", "ICMP"], state="readonly").pack(side=tk.LEFT, padx=2)
+ttk.Label(control_frame, text="Source IP:").pack(side=tk.LEFT, padx=2)
+ttk.Entry(control_frame, textvariable=src_ip_filter, width=12).pack(side=tk.LEFT, padx=2)
+ttk.Label(control_frame, text="Destination IP:").pack(side=tk.LEFT, padx=2)
+ttk.Entry(control_frame, textvariable=dst_ip_filter, width=12).pack(side=tk.LEFT, padx=2)
+
+filter_button = tk.Button(control_frame, text="Filter", command=apply_filter)
+filter_button.pack(side=tk.LEFT, padx=5)
+
+start_button = tk.Button(control_frame, text="Start", command=start_sniffer_thread, bg="green", fg="white")
+stop_button = tk.Button(control_frame, text="Stop", command=stop_sniffing, bg="red", fg="white")
+clear_button = tk.Button(control_frame, text="Clear", command=clear_packets, bg="gray", fg="white")
+map_button = tk.Button(control_frame, text="Map", command=plot_map)
+graph_button = tk.Button(control_frame, text="Graph", command=plot_graph)
+
+for btn in [start_button, stop_button, clear_button, map_button, graph_button]:
+    btn.pack(side=tk.LEFT, padx=5)
+
+packet_count = tk.IntVar(value=0)
+ttk.Label(control_frame, text="Packets:").pack(side=tk.LEFT, padx=5)
+ttk.Label(control_frame, textvariable=packet_count).pack(side=tk.LEFT, padx=5)
+
+columns = ("Source IP", "Destination IP", "Protocol", "Src Country", "Src City", "Dst Country", "Dst City", "Payload")
+frame = tk.Frame(root)
+frame.pack(fill=tk.BOTH, expand=True)
+scrollbar = ttk.Scrollbar(frame, orient="vertical")
+scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+tree = ttk.Treeview(frame, columns=columns, show="headings", yscrollcommand=scrollbar.set)
+scrollbar.config(command=tree.yview)
+for col in columns:
+    tree.heading(col, text=col)
+    tree.column(col, width=120)
+tree.pack(fill=tk.BOTH, expand=True)
+
+root.mainloop()
